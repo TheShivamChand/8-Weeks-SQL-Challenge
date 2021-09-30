@@ -6,28 +6,25 @@ Case Study: https://8weeksqlchallenge.com/case-study-1/
 
 
 -- 1. What is the total amount each customer spent at the restaurant?
-select mem.customer_id, sum(m.price) as price
-from members mem 
-join sales s on s.customer_id = mem.customer_id
+select customer_id, sum(price) as price
+from sales s
 join menu m on m.product_id = s.product_id
-group by mem.customer_id;
+group by customer_id;
 
 
 -- 2. How many days has each customer visited the restaurant?
-select mem.customer_id, count(distinct(s.order_date)) as visits
-from members mem
-join sales s on s.customer_id = mem.customer_id
+select customer_id, count(distinct(order_date)) as visits
+from sales s
 join menu m on m.product_id = s.product_id
-group by mem.customer_id;
+group by customer_id;
 
 
 -- 3. What was the first item from the menu purchased by each customer?
 with cte as
 (
-  select mem.customer_id, s.order_date, m.product_name,
-  row_number() over(partition by s.customer_id order by s.order_date) as rank
-  from members mem
-  join sales s on s.customer_id = mem.customer_id
+  select customer_id, order_date, product_name,
+  dense_rank() over(partition by customer_id order by order_date) as rank
+  from sales s
   join menu m on m.product_id = s.product_id
 )
 
@@ -47,14 +44,14 @@ order by most_purchased desc limit 1;
 
 -- 5. Which item was the most popular for each customer?
 with fav_item_cte as
-(select mem.customer_id, m.product_name, count(s.product_id) as product_count,
- dense_rank() over (partition by mem.customer_id 
-                    order by count(mem.customer_id) desc) as rank
-from members mem
-join sales s on mem.customer_id=s.customer_id
+(select customer_id, product_name, count(s.product_id) as product_count,
+ dense_rank() over (partition by customer_id 
+                    order by count(customer_id) desc) as rank
+from sales s
 join menu m on m.product_id=s.product_id
-group by mem.customer_id, m.product_name
+group by customer_id, product_name
 )
+
 select customer_id, product_name, product_count
 from fav_item_cte
 where rank=1;
@@ -72,4 +69,31 @@ with members_cte as
 )
 select customer_id, order_date, product_name
 from members_cte
-where rank=1
+where rank=1;
+
+
+-- 8. What is the total items and amount spent for each member before they became a member?
+select s.customer_id, count(distinct s.product_id) as total_items, sum(m.price) as total_amount
+from sales s
+join members mem on mem.customer_id=s.customer_id
+join menu m on m.product_id=s.product_id
+where mem.join_date>s.order_date
+group by s.customer_id;
+
+
+-- 9.  If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+with price_points as
+(
+  select *,
+  CASE
+  	WHEN product_id=1 then price*20
+ 	else price*10
+  END as points
+  from menu
+)
+
+select s.customer_id, sum(p.points) as total_points
+from price_points p
+join sales s on s.product_id=p.product_id
+group by s.customer_id;
+
