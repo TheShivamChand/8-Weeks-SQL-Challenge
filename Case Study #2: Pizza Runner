@@ -53,3 +53,24 @@ group by 1
 ) as a
 
 -- 7. For each customer, how many delivered pizzas had at least 1 change and how many had no changes?
+with orders as 
+(
+  select co.order_id,
+  co.pizza_id,
+  co.customer_id,
+  coalesce(case when(exclusions is NULL or exclusions = '') or (extras is NULL or exclusions='') then 1 end, 0) as one_change,
+  coalesce(case when(exclusions is not null or exclusions <> '') or (extras is not null or extras <> '') then 1 end, 0) as no_change
+  from customer_orders as co
+  inner join runner_orders as ro
+  on co.order_id=ro.order_id
+  where ro.pickup_time is not null
+)
+select customer_id,
+sum(case when one_change>0 and no_change>0 then 1
+    when one_change > 0 and no_change=0 then 1
+    when one_change = 0 and no_change>0 then 0 end) as one_change,
+sum(case when one_change>0 and no_change>0 then 0
+    when one_change > 0 and no_change=0 then 0
+    when one_change = 0 and no_change>0 then 1 end) as no_change
+from orders
+group by 1;
